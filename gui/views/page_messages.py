@@ -19,7 +19,7 @@ class MessageCard(QFrame):
         
         sender = msg_dict.get('sender', 'N/A')
         receiver_data = msg_dict.get('receiver', 'N/A')
-        system_time = msg_dict.get('system_time', '00:00:00.000') 
+        system_time = msg_dict.get('system_time', '00:00:00.000')
         
         sender_color = theme_colors['info']
         receiver_color = theme_colors['success']

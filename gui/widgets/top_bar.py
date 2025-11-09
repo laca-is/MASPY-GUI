@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout, QPushButton
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QIcon
 from gui.assets.theme.theme_dark import theme_colors
+from pathlib import Path
 
 class TopBar(QWidget):
     settings_button_clicked = pyqtSignal()
@@ -16,7 +17,8 @@ class TopBar(QWidget):
         self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.settings_button = QPushButton()
-        self.settings_button.setIcon(QIcon("gui/assets/icons/settings.svg"))
+        self.gui_path = Path(__file__).resolve().parent.parent
+        self.settings_button.setIcon(QIcon(f"{self.gui_path}/assets/icons/settings.svg"))
         self.settings_button.setIconSize(QSize(24, 24))
         self.settings_button.setFlat(True)
         self.settings_button.setCursor(Qt.PointingHandCursor)

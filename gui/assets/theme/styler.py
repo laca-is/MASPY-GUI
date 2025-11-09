@@ -1,9 +1,11 @@
 from gui.assets.theme.theme_dark import theme_colors as theme_dark
 from gui.assets.theme.theme_light import theme_colors as theme_light
+from pathlib import Path
 
 def load_stylesheet(theme_name="dark"):
     try:
-        with open('gui/assets/styles/theme.qss', 'r', encoding='utf-8') as f:
+        current_script_dir = Path(__file__).resolve().parent.parent
+        with open(f'{current_script_dir}/styles/theme.qss', 'r', encoding='utf-8') as f:
             stylesheet = f.read()
 
         if theme_name == "light":

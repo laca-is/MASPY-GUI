@@ -6,6 +6,7 @@ from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtCore import Qt, QSize
 from gui.assets.theme.theme_dark import theme_colors
 from gui.assets.theme.utils import apply_shadow
+from pathlib import Path
 
 class IntentionCard(QFrame):
     def __init__(self, intention_data, parent=None):
@@ -56,6 +57,8 @@ class MenuInicialPage(QWidget):
         self.command_queue = command_queue
         self.log_store = log_store
         self.simulation_paused = False
+
+        self.gui_path = Path(__file__).resolve().parent.parent
         
         self.current_page = 0
         self.items_per_page = 200
@@ -98,8 +101,10 @@ class MenuInicialPage(QWidget):
 
         self.pause_button = QPushButton(" Pausar")
         self.pause_button.setMinimumHeight(40)
-        self.pause_button.setMinimumWidth(150) 
-        self.pause_button.setIcon(QIcon("gui/assets/icons/pause-circle.svg"))
+        self.pause_button.setMinimumWidth(150)
+        
+
+        self.pause_button.setIcon(QIcon(f"{self.gui_path}/assets/icons/pause-circle.svg"))
         self.pause_button.setIconSize(QSize(20, 20))
         self.pause_button.setCursor(Qt.PointingHandCursor)
         self.pause_button.setEnabled(False)
@@ -193,10 +198,10 @@ class MenuInicialPage(QWidget):
         
         if self.simulation_paused:
             self.pause_button.setText(" Retomar")
-            self.pause_button.setIcon(QIcon("gui/assets/icons/play-circle.svg"))
+            self.pause_button.setIcon(QIcon(f"{self.gui_path}/assets/icons/play-circle.svg"))
         else:
             self.pause_button.setText(" Pausar")
-            self.pause_button.setIcon(QIcon("gui/assets/icons/pause-circle.svg"))
+            self.pause_button.setIcon(QIcon(f"{self.gui_path}/assets/icons/pause-circle.svg"))
             
     
     def on_store_updated(self):

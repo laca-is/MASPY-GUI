@@ -27,7 +27,7 @@ class SideBar(QFrame):
             layout.addWidget(btn)
             self.button_group.addButton(btn)
 
-        versao = QLabel("ver.2025.11.07")
+        versao = QLabel("ver.2025.11.09")
         versao.setAlignment(Qt.AlignRight)
         layout.addStretch(1)
         layout.addWidget(versao)

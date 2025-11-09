@@ -217,14 +217,16 @@ class AgentDetailWindow(QWidget):
         for log in log_history:
             timestamp = log.get('system_time', 'N/A') 
 
+            cycle = log.get('cycle', '?')
+
             current_beliefs = set(log.get('beliefs', []))
             gained_beliefs = current_beliefs - previous_beliefs
             lost_beliefs = previous_beliefs - current_beliefs
 
             for belief_str in gained_beliefs:
-                self._add_log_entry(self.belief_history_log, 'gain', {'raw': belief_str}, timestamp)
+                self._add_log_entry(self.belief_history_log, 'gain', {'raw': belief_str}, timestamp, cycle)
             for belief_str in lost_beliefs:
-                self._add_log_entry(self.belief_history_log, 'lose', {'raw': belief_str}, timestamp)
+                self._add_log_entry(self.belief_history_log, 'lose', {'raw': belief_str}, timestamp, cycle)
             
             previous_beliefs = current_beliefs
 
@@ -233,9 +235,9 @@ class AgentDetailWindow(QWidget):
             lost_goals = previous_goals - current_goals
 
             for goal_str in gained_goals:
-                self._add_log_entry(self.goal_history_log, 'gain', {'raw': goal_str}, timestamp)
+                self._add_log_entry(self.goal_history_log, 'gain', {'raw': goal_str}, timestamp, cycle)
             for goal_str in lost_goals:
-                self._add_log_entry(self.goal_history_log, 'lose', {'raw': goal_str}, timestamp)
+                self._add_log_entry(self.goal_history_log, 'lose', {'raw': goal_str}, timestamp, cycle)
 
             previous_goals = current_goals
 
@@ -248,14 +250,14 @@ class AgentDetailWindow(QWidget):
                 event_str = log.get('last_event', 'Gatilho desconhecido')
                 event_str = event_str.replace('gain:', '').replace('lose:', '')
 
-                time_str = f'<span style="color:#888;">[{timestamp}]</span>'
+                time_str = f'<span style="color:#888;">[{timestamp}][Cycle:{cycle}]</span>'
                 content_str = f"Gatilho: <b>{event_str}</b>  {current_last_intention}"
                 
                 self.intention_history_log.append(f'{time_str} <span style="color:{theme_colors["info"]};">{content_str}</span>')
                 
                 last_intention_in_history = current_last_intention
 
-    def _add_log_entry(self, log_widget, status, data_dict, timestamp=""):
+    def _add_log_entry(self, log_widget, status, data_dict, timestamp="", cycle=0):
         status_map = {
             'gain': ('[GAIN]', theme_colors['success']),
             'lose': ('[LOSE]', theme_colors['danger']),
@@ -267,7 +269,7 @@ class AgentDetailWindow(QWidget):
         if content is None:
             content = str(data_dict)
             
-        time_str = f'<span style="color:#888;">[{timestamp}]</span>' if timestamp else ''
+        time_str = f'<span style="color:#888;">[{timestamp}][Cycle:{cycle}]</span>' if timestamp else ''
         log_widget.append(f'{time_str} <span style="color:{color}; font-weight:bold;">{prefix}</span> {content}')
 
     def _extract_action_from_log(self, log_data):
