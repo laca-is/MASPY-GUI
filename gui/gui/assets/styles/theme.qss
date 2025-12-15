@@ -1,0 +1,302 @@
+/* =================================================================
+   STYLESHEET GLOBAL - PROPOSTA DE REDESIGN V1 (COM BLOCOS DE AGENTE)
+   ================================================================= */
+
+/* --- Configurações Globais (Fonte e Fundo Base) --- */
+* {
+    font-family: "Segoe UI", Arial, sans-serif;
+font-size: 14px;
+    border: none;
+}
+
+#AgentDetailWindow {
+    background-color: {background_primary};
+}
+
+QWidget {
+    color: {text_primary};
+    background-color: {background_primary};
+/* Fundo principal da janela */
+}
+
+/* Fundo das páginas dentro do QStackedWidget */
+QWidget#page_menu,
+QWidget#page_agentes,
+QWidget#page_mensagens,
+QWidget#page_ambiente {
+    background-color: {background_primary};
+}
+
+/* --- Áreas de Rolagem --- */
+QScrollArea {
+    background-color: transparent;
+    border: none;
+}
+QScrollArea > QWidget > QWidget {
+    background-color: transparent;
+}
+QScrollBar:vertical {
+    border: none;
+    background: {background_primary};
+width: 10px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background-color: {background_tertiary};
+    min-height: 30px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover {
+    background-color: {text_secondary};
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none;
+}
+
+
+/* --- Componentes Principais (TopBar, SideBar) --- */
+TopBar {
+    background-color: {background_secondary};
+    border-bottom: 1px solid {background_tertiary};
+}
+TopBar QLabel {
+    font-size: 18px;
+    font-weight: bold;
+    padding-left: 10px;
+}
+
+SideBar {
+    background-color: {background_secondary};
+border-right: 1px solid {background_tertiary};
+}
+SideBar QPushButton {
+    background-color: transparent;
+    color: {text_secondary};
+    font-weight: bold;
+    border-radius: 6px;
+padding: 12px 18px; /* Mais espaçamento interno */
+    margin: 4px 10px;
+    text-align: left;
+}
+SideBar QPushButton:hover {
+    background-color: {background_tertiary};
+    color: {text_primary};
+}
+SideBar QPushButton:checked {
+    background-color: {background_tertiary};
+    color: {text_primary};
+border-left: 3px solid {interactive_primary};
+}
+
+
+/* --- Cards e Conteúdo Elevado --- */
+/* Mantivemos a configuração base para todos */
+QFrame[class="card"], AgentCard, MessageCard {
+    background-color: {background_secondary};
+border-radius: 8px;
+    padding: 16px; 
+}
+
+/* --- ALTERAÇÃO AQUI: Borda específica para o AgentCard --- */
+AgentCard {
+    border: 2px solid {background_tertiary}; /* Cria o bloco visual */
+}
+AgentCard:hover {
+    border-color: {interactive_primary}; /* Efeito visual ao passar o mouse */
+}
+
+MessageCard {
+    margin-bottom: 8px;
+}
+
+
+/* --- MODIFICADO: Inputs Padrão --- */
+QLineEdit, QSpinBox, QDoubleSpinBox {
+    background-color: {background_primary};
+    color: {text_primary};
+    padding: 10px 12px;
+border: 1px solid {background_tertiary};
+    border-radius: 6px;
+    font-size: 14px;
+}
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border: 1px solid {interactive_primary};
+}
+
+QTextEdit, QListWidget, QTreeWidget {
+    background-color: {background_primary};
+    color: {text_primary};
+    border: 1px solid {background_tertiary};
+    border-radius: 6px;
+    padding: 8px;
+/* Espaçamento interno para o texto não colar na borda */
+}
+
+/* Ajuste de foco para consistência */
+QTextEdit:focus, QListWidget:focus, QTreeWidget:focus {
+    border: 1px solid {interactive_primary};
+}
+
+
+/* --- Abas (Tabs) --- */
+QTabWidget::pane {
+    background-color: {background_secondary};
+    border: 1px solid {background_tertiary};
+    border-top: none;
+    border-bottom-left-radius: 6px;
+border-bottom-right-radius: 6px;
+}
+QTabWidget::tab-bar { alignment: left; }
+QTabBar::tab {
+    background: {background_secondary};
+    color: {text_secondary};
+    border: 1px solid {background_tertiary};
+border-bottom: none;
+    padding: 14px 25px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    font-weight: bold;
+    margin-right: 2px;
+}
+QTabBar::tab:hover {
+    background: {background_tertiary};
+color: {text_primary};
+}
+QTabBar::tab:selected {
+    background: {background_secondary}; /* Mesmo fundo do painel */
+    color: {interactive_primary};
+border-bottom: 2px solid {interactive_primary}; /* Indicador de seleção */
+}
+
+#AgentDetailWindow QTabBar::tab {
+    font-size: 13px;
+/* Um pouco maior que o padrão */
+    font-weight: bold;
+    padding: 14px 35px;
+/* Mais padding horizontal (antes era 25px) */
+    min-width: 100px;
+/* Garante uma largura mínima */
+}
+
+
+/* =================================================================
+   BOTÕES
+   ================================================================= */
+
+QPushButton {
+    background-color: {background_tertiary};
+color: {text_primary};
+    font-weight: bold;
+    border-radius: 6px;
+    padding: 10px 18px;
+}
+QPushButton:hover {
+    background-color: {text_disabled};
+}
+QPushButton:pressed {
+    background-color: {background_primary}; /* Feedback de clique */
+    padding-top: 12px;
+    padding-bottom: 8px;
+}
+
+/* --- Botões de Ação Primária --- */
+QPushButton[class="primary"] {
+    background-color: {interactive_primary};
+    color: {interactive_text};
+}
+QPushButton[class="primary"]:hover {
+    background-color: {interactive_hover};
+}
+QPushButton[class="primary"]:pressed {
+    background-color: {interactive_pressed};
+}
+
+/* --- Botão de Alerta (Pausar) --- */
+QPushButton#pause_button {
+    background-color: {warning};
+    color: {background_primary};
+}
+QPushButton#pause_button:hover {
+    background-color: {warning_hover}; /* CORRIGIDO */
+}
+
+/* --- Botões de Filtro --- */
+QPushButton[objectName="FilterButton"] {
+    background-color: transparent;
+border: 1px solid {background_tertiary};
+    padding: 8px 12px;
+    text-align: left;
+}
+QPushButton[objectName="FilterButton"]:hover {
+    background-color: {background_tertiary};
+    color: {text_primary};
+}
+QPushButton[objectName="FilterButton"]:checked {
+    background-color: {interactive_primary};
+    color: {interactive_text};
+    border-color: {interactive_primary};
+}
+
+/* =================================================================
+   HIERARQUIA TIPOGRÁFICA E DE COMPONENTES
+   ================================================================= */
+
+/* --- Títulos Principais de Página --- */
+QLabel[class="h1"] {
+    font-size: 28px;
+font-weight: bold;
+    color: {text_primary};
+    margin-bottom: 10px; /* Espaçamento abaixo do título */
+}
+
+/* --- Títulos de Seção --- */
+QLabel[class="h2"] {
+    font-size: 18px;
+font-weight: bold;
+    color: {text_secondary};
+    margin-top: 10px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid {background_tertiary};
+    padding-bottom: 5px;
+}
+
+/* --- Estilos para os Cards --- */
+QLabel[class="card-title-bold"] {
+    font-size: 16px;
+    font-weight: bold;
+    color: {text_primary};
+}
+
+QLabel[class="card-metadata"] {
+    font-size: 13px;
+    color: {text_secondary};
+}
+
+QLabel[class="card-number"] {
+    font-size: 36px;
+    font-weight: bold;
+    color: {interactive_primary};
+}
+
+
+/* --- Estilos para Telas de Detalhes --- */
+QLabel[class="detail-key"] {
+    font-weight: bold;
+    color: {text_secondary};
+}
+QLabel[class="detail-value"] {
+    font-size: 14px;
+    color: {text_primary};
+}
+
+/* Aumenta a fonte do conteúdo (listas, logs) APENAS na tela de detalhes do agente E ambiente */
+#AgentDetailWindow QListWidget,
+#AgentDetailWindow QTextEdit,
+#AgentDetailWindow QTreeWidget,
+QWidget#page_ambiente QListWidget,
+QWidget#page_ambiente QTextEdit,
+QWidget#page_ambiente QTreeWidget,
+QLabel#MessageCardBody
+{
+    font-size: 20px;
+}
