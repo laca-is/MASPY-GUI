@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QHeaderView, QTextEdit, QPushButton, QButtonGroup,
                              QListWidget, QListWidgetItem, QSizePolicy)
 from PyQt5.QtCore import Qt
-from gui.assets.theme.theme_dark import theme_colors
+from gui.assets.theme.styler import current_theme
 
 class AmbientePage(QWidget):
     def __init__(self, log_store):
@@ -23,6 +23,7 @@ class AmbientePage(QWidget):
 
         self.log_store.environment_state_updated.connect(self.on_environment_state_updated)
         self.log_store.environment_history_updated.connect(self.on_environment_history_updated)
+        self.log_store.store_updated.connect(self.check_timeline_update)
 
         self.on_environment_state_updated(self.log_store.get_environment_states_at_index(0))
 
@@ -37,7 +38,7 @@ class AmbientePage(QWidget):
         left_column.setMaximumWidth(250)
         left_layout = QVBoxLayout(left_column)
 
-        left_title = QLabel("Ambientes")
+        left_title = QLabel("Environments")
         left_title.setProperty("class", "h2")
         left_layout.addWidget(left_title)
         
@@ -60,11 +61,15 @@ class AmbientePage(QWidget):
 
         self._show_placeholder()
 
+    def update_theme(self):
+        if self.selected_environment:
+            self.rebuild_history_log()
+
     def _show_placeholder(self):
         self._clear_layout(self.details_layout)
-        placeholder = QLabel("Selecione um ambiente à esquerda para ver os detalhes.")
+        placeholder = QLabel("Select an environment to view details")
         placeholder.setAlignment(Qt.AlignCenter)
-        placeholder.setStyleSheet("font-size: 16px; color: #888;")
+        placeholder.setProperty("class", "text-secondary")
         self.details_layout.addWidget(placeholder)
 
     def _clear_layout(self, layout):
@@ -76,7 +81,7 @@ class AmbientePage(QWidget):
     def _build_details_ui(self, env_name):
         self._clear_layout(self.details_layout)
         
-        title = QLabel(f"Monitorando: {env_name}")
+        title = QLabel(f"Monitoring: {env_name}")
         title.setProperty("class", "h1")
         self.details_layout.addWidget(title)
 
@@ -86,7 +91,7 @@ class AmbientePage(QWidget):
         agents_frame = QFrame()
         agents_frame.setProperty("class", "card")
         agents_layout = QVBoxLayout(agents_frame)
-        agents_title = QLabel("Agentes Conectados")
+        agents_title = QLabel("Conected Agents")
         agents_title.setProperty("class", "h2")
         self.agents_list = QListWidget()
         agents_layout.addWidget(agents_title)
@@ -96,7 +101,7 @@ class AmbientePage(QWidget):
         state_frame = QFrame()
         state_frame.setProperty("class", "card")
         state_layout = QVBoxLayout(state_frame)
-        state_title = QLabel("Estado Atual (Percepts)")
+        state_title = QLabel("Percepts")
         state_title.setProperty("class", "h2")
         self.state_list = QListWidget()
         state_layout.addWidget(state_title)
@@ -108,8 +113,9 @@ class AmbientePage(QWidget):
         history_frame = QFrame()
         history_frame.setProperty("class", "card")
         history_layout = QVBoxLayout(history_frame)
-        history_title = QLabel("Histórico de Mudanças")
+        history_title = QLabel("Changes History")
         history_title.setProperty("class", "h2")
+        
         self.history_log = QTextEdit()
         self.history_log.setReadOnly(True)
         self.history_log.setMinimumHeight(200)
@@ -125,7 +131,7 @@ class AmbientePage(QWidget):
         button = QPushButton(env_name)
         button.setObjectName("FilterButton")
         button.setCheckable(True)
-        button.clicked.connect(lambda: self.on_environment_selected(env_name))
+        button.clicked.connect(lambda checked, n=env_name: self.on_environment_selected(n))
         self.env_button_group.addButton(button)
         
         for i in range(self.env_list_layout.count()):
@@ -142,12 +148,15 @@ class AmbientePage(QWidget):
         self.selected_environment = env_name
         self._build_details_ui(env_name)
 
-        all_states = self.log_store.get_environment_states_at_index(
-            self.log_store.current_timeline_index if not self.log_store.is_live else len(self.log_store.all_logs_timeline) - 1
-        )
+        idx = self.log_store.current_timeline_index
+        all_states = self.log_store.get_environment_states_at_index(idx)
+        
         self.on_environment_state_updated(all_states)
-
         self.rebuild_history_log()
+
+    def check_timeline_update(self):
+        if self.isVisible() and self.selected_environment:
+            self.on_timeline_state_changed(self.log_store.current_timeline_index)
 
     def on_environment_state_updated(self, all_envs_data):
         if not all_envs_data:
@@ -164,14 +173,14 @@ class AmbientePage(QWidget):
             self.agents_list.clear()
             agents = data.get('connected_agents', [])
             if not agents:
-                self.agents_list.addItem(QListWidgetItem("Nenhum agente conectado."))
+                self.agents_list.addItem(QListWidgetItem("No agents are connected."))
             else:
                 self.agents_list.addItems(sorted(agents))
 
             self.state_list.clear()
             percepts = data.get('percepts', {})
             if not percepts:
-                self.state_list.addItem(QListWidgetItem("Nenhum percept no ambiente."))
+                self.state_list.addItem(QListWidgetItem("No Percepts in the Environment"))
             else:
                 for key, value in sorted(percepts.items()):
                     self.state_list.addItem(QListWidgetItem(f"{key}: {value}"))
@@ -179,6 +188,8 @@ class AmbientePage(QWidget):
     def on_environment_history_updated(self, env_name, history_entry):
         if env_name == self.selected_environment and self.log_store.is_live:
             self._format_and_add_history_entry(history_entry)
+            sb = self.history_log.verticalScrollBar()
+            sb.setValue(sb.maximum())
 
     def rebuild_history_log(self):
         if not self.selected_environment:
@@ -189,32 +200,40 @@ class AmbientePage(QWidget):
 
         for entry in history_list:
             self._format_and_add_history_entry(entry)
-            
+
     def _format_and_add_history_entry(self, entry):
-        log_type = entry.get('type')
-        
+        raw_type = getattr(entry, 'type', 'unknown') or 'unknown'
+        content = str(getattr(entry, 'content', 'N/A')).replace('<', '&lt;').replace('>', '&gt;')
+        action = str(getattr(entry, 'agent_action', 'N/A'))
+        time = getattr(entry, 'system_time', 'N/A')
+
+        log_type_key = raw_type.lower()
+
         color_map = {
-            'create': theme_colors['success'],
-            'delete': theme_colors['danger'],
-            'change': theme_colors['warning']
+            'create': current_theme.get('success', '#10B981'),
+            'delete': current_theme.get('danger', '#EF4444'),
+            'change': current_theme.get('warning', '#F59E0B'),
+            'update': current_theme.get('info', '#3B82F6')
         }
+        
         type_map = {
             'create': '[CREATE]',
             'delete': '[DELETE]',
-            'change': '[CHANGE]'
+            'change': '[CHANGE]',
+            'update': '[UPDATE]'
         }
-        
-        color = color_map.get(log_type, theme_colors['text_primary'])
-        type_str = type_map.get(log_type, '[EVENT]')
-        time = entry.get('time', 'N/A')
-        content = entry.get('content', 'N/A').replace('<', '&lt;').replace('>', '&gt;')
-        action = entry.get('agent_action', 'N/A')
+
+        color = color_map.get(log_type_key, current_theme.get('text_primary', '#FFFFFF'))
+        type_str = type_map.get(log_type_key, f'[{raw_type.upper()}]')
+
+        text_sec_color = current_theme.get('text_secondary', '#9CA3AF')
+        text_pri_color = current_theme.get('text_primary', '#FFFFFF')
 
         html = (
-            f'<span style="color:{theme_colors["text_secondary"]};">[{time}]</span> '
+            f'<span style="color:{text_sec_color};">[{time}]</span> '
             f'<span style="color:{color}; font-weight:bold;">{type_str}</span> '
-            f'<span style="color:{theme_colors["text_primary"]};">{content}</span> '
-            f'<span style="color:{theme_colors["text_secondary"]}; font-style:italic;"> (Ação: {action})</span>'
+            f'<span style="color:{text_pri_color};">{content}</span> '
+            f'<span style="color:{text_sec_color}; font-style:italic;"> (Action: {action})</span>'
         )
         self.history_log.append(html)
 

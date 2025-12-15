@@ -1,7 +1,6 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout, QPushButton
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QIcon
-from gui.assets.theme.theme_dark import theme_colors
 from pathlib import Path
 
 class TopBar(QWidget):
@@ -10,10 +9,11 @@ class TopBar(QWidget):
     def __init__(self, title="Menu"):
         super().__init__()
         self.setFixedHeight(60)
+        self.setProperty("class", "topbar")
 
         self.title_label = QLabel(title)
         self.title_label.setFont(QFont("Arial", 16, QFont.Bold))
-        self.title_label.setStyleSheet(f"color: {theme_colors['text_primary']};")
+        self.title_label.setProperty("class", "topbar-title")
         self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.settings_button = QPushButton()

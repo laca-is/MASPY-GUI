@@ -1,86 +1,251 @@
 import re
-import math 
+import math
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QPushButton, QFrame, QButtonGroup, QLineEdit 
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QPushButton, QFrame, QLineEdit, QButtonGroup,
+    QListView, QAbstractItemView, QStyledItemDelegate, QScrollArea
 )
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
-from gui.assets.theme.theme_dark import theme_colors
-from gui.assets.theme.utils import apply_shadow
+from PyQt5.QtCore import (
+    Qt, QAbstractListModel, QModelIndex, QSize, QRectF, QRect
+)
+from PyQt5.QtGui import (
+    QColor, QPainter, QFontMetrics, QFont, QPen, QPainterPath
+)
+from gui.assets.theme.styler import current_theme
 
-class MessageCard(QFrame):
-    def __init__(self, msg_dict, active_filter, action_string, parent=None):
+PADDING = 10
+CARD_MARGIN = 6
+
+class PaginatedMessageModel(QAbstractListModel):
+    def __init__(self, log_store, items_per_page=100, parent=None):
         super().__init__(parent)
-        self.setProperty("class", "page")
-        self.setFrameShape(QFrame.StyledPanel)
-        main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(5)
+        self.log_store = log_store
+        self.items_per_page = items_per_page
+        self.current_page = 0
         
-        sender = msg_dict.get('sender', 'N/A')
-        receiver_data = msg_dict.get('receiver', 'N/A')
-        system_time = msg_dict.get('system_time', '00:00:00.000')
+        self._raw_list_ref = []  
+        self._limit_index = 0    
+        self._filtered_indices = None 
+        self._total_count = 0
+
+    def update_data_cache(self):
+        self._raw_list_ref = self.log_store.get_messages_reference()
+        self._limit_index = self.log_store.get_message_count_limit()
         
-        sender_color = theme_colors['info']
-        receiver_color = theme_colors['success']
-        
-        if isinstance(receiver_data, str):
-            receivers_list = re.findall(r"[\"']?([\w\.-]+)[\"']?", receiver_data)
-        elif isinstance(receiver_data, list):
-            receivers_list = receiver_data
+        if self._filtered_indices is not None:
+            self._total_count = len(self._filtered_indices)
         else:
-            receivers_list = [str(receiver_data)]
+            self._total_count = self._limit_index
 
-        if active_filter:
-            if sender == active_filter:
-                sender_color = theme_colors['danger'] 
-                receiver_color = theme_colors['info'] 
-            elif active_filter in receivers_list:
-                sender_color = theme_colors['info']   
-                receiver_color = theme_colors['danger'] 
+    def rowCount(self, parent=QModelIndex()):
+        remaining = self._total_count - (self.current_page * self.items_per_page)
+        return max(0, min(remaining, self.items_per_page))
 
-        header_layout = QHBoxLayout()
-        header_text = f"<b><font color='{sender_color}'>{sender}</font></b> → <b><font color='{receiver_color}'>{receiver_data}</font></b>"
-        header_label = QLabel(header_text)
-        header_label.setObjectName("MessageCardHeader")
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid(): return None
         
-        time_label = QLabel(f"[{system_time}]")
-        time_label.setStyleSheet(f"color: {theme_colors['text_secondary']};")
+        if role == Qt.DisplayRole:
+            row = index.row()
+            real_offset = (self.current_page * self.items_per_page) + row
+            
+            target_msg = None
+            if self._filtered_indices is None:
+                if real_offset < self._limit_index:
+                    actual_index = self._limit_index - 1 - real_offset
+                    if 0 <= actual_index < len(self._raw_list_ref):
+                        target_msg = self._raw_list_ref[actual_index]
+            else:
+                total = len(self._filtered_indices)
+                if real_offset < total:
+                    idx = self._filtered_indices[total - 1 - real_offset]
+                    if idx < len(self._raw_list_ref):
+                        target_msg = self._raw_list_ref[idx]
+            return target_msg
+                
+        return None
+
+    def set_page(self, page):
+        self.beginResetModel()
+        self.current_page = page
+        self.endResetModel()
+
+    def set_filter(self, participant_name):
+        self.beginResetModel()
+        self.current_page = 0
+        if not participant_name:
+            self._filtered_indices = None
+        else:
+            self._raw_list_ref = self.log_store.get_messages_reference()
+            limit = self.log_store.get_message_count_limit()
+            indices = []
+            for i in range(limit):
+                m = self._raw_list_ref[i]
+                sender = m.sender
+                receiver_str = m.receiver 
+                
+                receivers = []
+                if "[" in receiver_str:
+                     receivers = re.findall(r"[\"']?([\w\.-]+)[\"']?", receiver_str)
+                else:
+                     receivers = [receiver_str]
+
+                if sender == participant_name or participant_name in receivers:
+                    indices.append(i)
+            self._filtered_indices = indices
         
-        header_layout.addWidget(header_label)
-        header_layout.addStretch()
-        header_layout.addWidget(time_label)
+        self.update_data_cache()
+        self.endResetModel()
 
-        performative = msg_dict.get('performative', 'MSG')
-        content_raw = msg_dict.get('content', {}).get('raw', 'N/A')
+    def get_total_items(self): return self._total_count
+    def get_total_pages(self): return max(1, math.ceil(self._total_count / self.items_per_page))
 
-        body_text = f"<b><font color='{theme_colors['warning']}'>[{performative}]</font></b> {content_raw}"
-        body_label = QLabel(body_text)
-        body_label.setObjectName("MessageCardBody")
-        body_label.setWordWrap(True)
+class MessageCardDelegate(QStyledItemDelegate):
+    def __init__(self, parent_view):
+        super().__init__(parent_view)
+        self.active_filter = None
+        self._update_colors()
+
+    def _update_colors(self):
+        self.c_bg = QColor(current_theme.get('background_secondary', '#1F2937'))
+        self.c_border = QColor(current_theme.get('background_tertiary', '#4B5563'))
+
+        is_light = current_theme.get('background_primary', '#111827') != "#111827"
+        shadow_alpha = 60 if is_light else 30
+        self.c_shadow = QColor(0, 0, 0, shadow_alpha)
         
-        action_label = QLabel(f"<i>Estado do Remetente: {action_string}</i>")
-        action_label.setStyleSheet(f"color: {theme_colors['text_secondary']};")
-        action_label.setObjectName("MessageCardAction")
+        self.c_info = QColor(current_theme.get('info', '#0EA5E9'))
+        self.c_success = QColor(current_theme.get('success', '#10B981'))
+        self.c_danger = QColor(current_theme.get('danger', '#EF4444'))
+        self.c_warning = QColor(current_theme.get('warning', '#F59E0B'))
+        
+        self.c_text_sec = QColor(current_theme.get('text_secondary', '#9CA3AF'))
+        self.c_text_pri = QColor(current_theme.get('text_primary', '#F9FAFB'))
+        self.c_arrow = QColor(current_theme.get('text_disabled', '#6B7280'))
+        
+        base_font = QFont("Segoe UI", 11)
+        self.font_bold = QFont(base_font); self.font_bold.setBold(True)
+        self.font_italic = QFont(base_font); self.font_italic.setPointSize(10); self.font_italic.setItalic(True)
+        self.font_normal = base_font
+        self.font_small = QFont(base_font); self.font_small.setPointSize(10)
+        self.fm_normal = QFontMetrics(self.font_normal)
 
-        main_layout.addLayout(header_layout) 
-        main_layout.addWidget(action_label)  
-        main_layout.addWidget(body_label)
+    def update_theme(self):
+        self._update_colors()
 
-        apply_shadow(self, blur_radius=10, offset_y=1, color="#0A0A0A")
+    def set_filter_state(self, active_filter):
+        self.active_filter = active_filter
+
+    def sizeHint(self, option, index):
+        msg = index.data(Qt.DisplayRole)
+        if not msg: return QSize(0,0)
+
+        width = option.rect.width() - (2 * PADDING) - 10
+        if width <= 0: width = 200
+
+        header_height = 55 
+        content_txt = f"[{msg.performative}] {msg.content}"
+        rect = self.fm_normal.boundingRect(0, 0, width, 10000, Qt.TextWordWrap, content_txt)
+        
+        total_height = header_height + rect.height() + 10 
+        return QSize(option.rect.width(), int(total_height))
+
+    def paint(self, painter, option, index):
+        msg = index.data(Qt.DisplayRole)
+        if not msg: return
+
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        rect = option.rect.adjusted(5, 5, -5, -5)
+        
+        path_shadow = QPainterPath()
+        path_shadow.addRoundedRect(QRectF(rect.adjusted(2, 2, 2, 2)), 6, 6)
+        painter.fillPath(path_shadow, self.c_shadow)
+
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(rect), 6, 6)
+        painter.setBrush(self.c_bg)
+        painter.setPen(QPen(self.c_border, 1))
+        painter.drawPath(path)
+
+        sender = msg.sender
+        receiver_data = msg.receiver
+        system_time = f"[{msg.system_time}]"
+        performative = f"[{msg.performative}]"
+        content = msg.content
+        action_str = f"Sender state: {msg.sender_action}"
+
+        c_snd = self.c_info
+        c_rcv = self.c_success
+        
+        if self.active_filter:
+            is_receiver = self.active_filter in receiver_data 
+            if sender == self.active_filter:
+                c_snd = self.c_danger
+                c_rcv = self.c_info
+            elif is_receiver:
+                c_snd = self.c_info
+                c_rcv = self.c_danger
+
+        current_y = rect.top() + PADDING + self.fm_normal.ascent()
+        current_x = rect.left() + PADDING
+        
+        painter.setFont(self.font_bold)
+        painter.setPen(c_snd)
+        painter.drawText(current_x, current_y, sender)
+        current_x += QFontMetrics(self.font_bold).width(sender) + 5
+
+        painter.setFont(self.font_normal)
+        painter.setPen(self.c_arrow)
+        painter.drawText(current_x, current_y, "→")
+        current_x += QFontMetrics(self.font_normal).width("→") + 5
+
+        painter.setFont(self.font_bold)
+        painter.setPen(c_rcv)
+        painter.drawText(current_x, current_y, receiver_data)
+        
+        painter.setFont(self.font_small)
+        painter.setPen(self.c_text_sec)
+        time_width = QFontMetrics(self.font_small).width(system_time)
+        painter.drawText(rect.right() - PADDING - time_width, current_y, system_time)
+
+        current_y += 18 
+        painter.setFont(self.font_italic)
+        painter.setPen(self.c_text_sec)
+        painter.drawText(rect.left() + PADDING, current_y, action_str)
+
+        current_y += 20 
+        
+        painter.setFont(self.font_bold)
+        painter.setPen(self.c_warning)
+        painter.drawText(rect.left() + PADDING, current_y, performative)
+        
+        perf_width = QFontMetrics(self.font_bold).width(performative)
+        
+        text_rect = QRectF(
+            rect.left() + PADDING + perf_width + 5, 
+            current_y - self.fm_normal.ascent(), 
+            rect.width() - (2 * PADDING) - perf_width - 5,
+            rect.bottom() - current_y + self.fm_normal.ascent() - PADDING
+        )
+        
+        painter.setFont(self.font_normal)
+        painter.setPen(self.c_text_pri)
+        painter.drawText(text_rect, Qt.AlignLeft | Qt.TextWordWrap, content)
+
+        painter.restore()
 
 class MensagensPage(QWidget):
     def __init__(self, log_store):
         super().__init__()
+        self.setProperty("class", "page")
         self.log_store = log_store
+        
         self.log_store_index = 0
         self.participants = set()
         self.active_filter = None
         self.button_group = QButtonGroup(self)
         self.button_group.setExclusive(True)
-        
-        self.current_page = 0
-        self.messages_per_page = 200 
         
         self._setup_ui()
 
@@ -90,13 +255,12 @@ class MensagensPage(QWidget):
 
         card_frame = QFrame()
         card_frame.setFrameShape(QFrame.StyledPanel)
-        card_frame.setObjectName("MainCard")
         card_frame.setProperty("class", "card")
         
         card_layout = QVBoxLayout(card_frame)
         card_layout.setContentsMargins(15, 15, 15, 15)
 
-        title = QLabel("Monitor de Comunicação")
+        title = QLabel("Communication Monitor")
         title.setProperty("class", "h1")
         card_layout.addWidget(title)
 
@@ -107,15 +271,15 @@ class MensagensPage(QWidget):
         left_layout = QVBoxLayout(left_column)
         left_layout.setContentsMargins(0, 5, 10, 5)
 
-        filter_title = QLabel("Filtrar por Participante:")
+        filter_title = QLabel("Agent Filter:")
         filter_title.setObjectName("ColumnTitle")
         filter_title.setProperty("class", "h2")
         
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Buscar participante...")
+        self.search_input.setPlaceholderText("Search Agent")
         self.search_input.textChanged.connect(self._on_participant_search_changed)
 
-        self.show_all_button = QPushButton("Mostrar Todas")
+        self.show_all_button = QPushButton("Show all")
         self.show_all_button.setObjectName("FilterButton")
         self.show_all_button.setCheckable(True)
         self.show_all_button.setChecked(True)
@@ -142,37 +306,39 @@ class MensagensPage(QWidget):
         right_layout.setContentsMargins(10, 5, 0, 5)
 
         log_title_layout = QHBoxLayout()
-        log_title = QLabel("Histórico de Mensagens:")
-        log_title.setObjectName("ColumnTitle")
+        log_title = QLabel("Messages History:")
         log_title.setProperty("class", "h2")
-        
+
         self.message_count_label = QLabel("Total: 0")
-        self.message_count_label.setStyleSheet("color: #9CA3AF; font-size: 14px; margin-top: 10px;")
+        self.message_count_label.setProperty("class", "text-secondary")
         
         log_title_layout.addWidget(log_title)
         log_title_layout.addStretch()
         log_title_layout.addWidget(self.message_count_label)
 
-        self.message_scroll_area = QScrollArea()
-        self.message_scroll_area.setWidgetResizable(True)
+        self.message_list_view = QListView()
+        self.message_list_view.setFrameShape(QFrame.NoFrame)
+        self.message_list_view.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.message_list_view.setStyleSheet("background: transparent; border: none;")
+        self.message_list_view.setUniformItemSizes(False)
+        self.message_list_view.setResizeMode(QListView.Adjust)
         
-        self.message_container = QWidget()
-        self.message_layout = QVBoxLayout(self.message_container)
-        self.message_layout.setAlignment(Qt.AlignTop)
-        self.message_scroll_area.setWidget(self.message_container)
+        self.model = PaginatedMessageModel(self.log_store, items_per_page=100)
+        self.delegate = MessageCardDelegate(self.message_list_view)
         
+        self.message_list_view.setModel(self.model)
+        self.message_list_view.setItemDelegate(self.delegate)
+
         pagination_layout = QHBoxLayout()
-        pagination_layout.setContentsMargins(0, 10, 0, 0)
-        
-        self.btn_prev = QPushButton("« Anterior")
-        self.btn_prev.clicked.connect(self._go_to_prev_page)
+        self.btn_prev = QPushButton("« Previous")
+        self.btn_prev.clicked.connect(self._prev_page)
         self.btn_prev.setEnabled(False)
         
-        self.page_label = QLabel("Página 1 de 1")
+        self.page_label = QLabel("Page 1 of 1")
         self.page_label.setAlignment(Qt.AlignCenter)
         
-        self.btn_next = QPushButton("Próxima »")
-        self.btn_next.clicked.connect(self._go_to_next_page)
+        self.btn_next = QPushButton("Next »")
+        self.btn_next.clicked.connect(self._next_page)
         self.btn_next.setEnabled(False)
         
         pagination_layout.addWidget(self.btn_prev)
@@ -182,11 +348,58 @@ class MensagensPage(QWidget):
         pagination_layout.addWidget(self.btn_next)
 
         right_layout.addLayout(log_title_layout) 
-        right_layout.addWidget(self.message_scroll_area, stretch=1) 
-        right_layout.addLayout(pagination_layout) 
+        right_layout.addWidget(self.message_list_view, stretch=1) 
+        right_layout.addLayout(pagination_layout)
+        
         columns_layout.addWidget(right_column, stretch=2)
-
         main_layout.addWidget(card_frame)
+
+    def on_store_updated(self):
+        self.model.update_data_cache()
+        self._update_pagination_ui()
+        if self.model.current_page == 0:
+             self.message_list_view.viewport().update()
+
+        all_msgs = self.log_store.get_all_messages()
+        if len(all_msgs) > self.log_store_index:
+            new_msgs = all_msgs[self.log_store_index:]
+            self.log_store_index = len(all_msgs)
+            
+            for m in new_msgs:
+                self._add_participant(m.sender)
+                
+                recv_str = m.receiver
+                if "[" in recv_str: 
+                    found = re.findall(r"[\"']?([\w\.-]+)[\"']?", recv_str)
+                    for x in found: self._add_participant(x)
+                else:
+                    self._add_participant(recv_str)
+
+    def _update_pagination_ui(self):
+        total_items = self.model.get_total_items()
+        total_pages = self.model.get_total_pages()
+        current = self.model.current_page
+        
+        self.page_label.setText(f"Page {current + 1} of {total_pages}")
+        
+        txt_total = f"Total: {total_items}"
+        if self.active_filter: txt_total = f"Filtering: {total_items}"
+        self.message_count_label.setText(txt_total)
+        
+        self.btn_prev.setEnabled(current > 0)
+        self.btn_next.setEnabled(current < total_pages - 1)
+
+    def _next_page(self):
+        if self.model.current_page < self.model.get_total_pages() - 1:
+            self.model.set_page(self.model.current_page + 1)
+            self._update_pagination_ui()
+            self.message_list_view.scrollToTop()
+
+    def _prev_page(self):
+        if self.model.current_page > 0:
+            self.model.set_page(self.model.current_page - 1)
+            self._update_pagination_ui()
+            self.message_list_view.scrollToTop()
 
     def _on_participant_search_changed(self, text):
         search_text = text.strip().lower()
@@ -196,166 +409,20 @@ class MensagensPage(QWidget):
             
             button_text = button.text().lower()
             button.setVisible(search_text in button_text)
-    
-    def _extract_action_from_log(self, log_data):
-        if not log_data: 
-            return "Estado desconhecido"
-
-        desc = log_data.get("desc", "")
-        if desc:
-            match = re.search(r"doing action \*(\w+)", desc)
-            if match:
-                return f"Executando: {match.group(1)}"
-            
-            match = re.search(r"action:\s*\*(\w+)", desc)
-            if match:
-                return f"Executando: {match.group(1)}"
-        
-        running_intentions = log_data.get("running_intentions", [])
-        if not running_intentions:
-            return "Ocioso"
-        try:
-            main_intention_str = running_intentions[0]
-            match = re.search(r"->\s*([\w\d_]+)\(.*\)\s*Context=", main_intention_str)
-            if match: return f"Plano: {match.group(1)}"
-            match = re.search(r"\]\s*,\s*([\w\d_]+)\(.*\)", main_intention_str)
-            if match: return f"Plano: {match.group(1)}"
-        except (IndexError, TypeError):
-            pass
-        
-        return "Executando Intenção"
-
-    def on_store_updated(self):
-        all_messages_from_store = self.log_store.get_all_messages()
-        if len(all_messages_from_store) == self.log_store_index:
-            return 
-
-        new_messages = all_messages_from_store[self.log_store_index:]
-        self.log_store_index = len(all_messages_from_store)
-        
-        new_messages_added = False
-        for msg_dict in new_messages:
-            new_messages_added = True
-            
-            sender = msg_dict.get('sender', 'N/A')
-            self._add_participant(sender)
-            
-            receiver_data = msg_dict.get('receiver', 'N/A')
-            if isinstance(receiver_data, str):
-                receivers = re.findall(r"[\"']?([\w\.-]+)[\"']?", receiver_data)
-            elif isinstance(receiver_data, list):
-                receivers = receiver_data
-            else:
-                receivers = [str(receiver_data)]
-
-            for r in receivers:
-                self._add_participant(r)
-
-        if not new_messages_added:
-            return
-
-        if self.current_page == 0:
-             self._rebuild_message_display()
-        else:
-            self._update_pagination_labels()
 
     def _add_participant(self, agent_name):
-        if agent_name not in self.participants and agent_name not in ['N/A', 'Desconhecido', 'broadcast', '[]']:
-            self.participants.add(agent_name)
-            self._add_participant_button(agent_name)
-            return True 
-        return False
+        if not agent_name or agent_name in self.participants or agent_name in ['N/A', 'Unknown', 'broadcast', '[]']:
+            return False
+        
+        self.participants.add(agent_name)
+        self._add_participant_button(agent_name)
+        return True
 
-    def _get_filtered_messages(self):
-        current_messages = self.log_store.get_all_messages()
-        
-        if self.active_filter is None:
-            filtered_messages = current_messages
-        else:
-            filtered_messages = []
-            for msg in current_messages:
-                sender = msg.get('sender', 'N/A')
-                receiver_data = msg.get('receiver', 'N/A')
-                
-                if isinstance(receiver_data, str):
-                    receivers = re.findall(r"[\"']?([\w\.-]+)[\"']?", receiver_data)
-                elif isinstance(receiver_data, list):
-                    receivers = receiver_data
-                else:
-                    receivers = [str(receiver_data)]
-                
-                if self.active_filter == sender or self.active_filter in receivers:
-                    filtered_messages.append(msg)
-
-        filtered_messages.sort(key=lambda m: m.get('system_time', '0'), reverse=True)
-        return filtered_messages
-
-    def _update_pagination_labels(self, total_filtered=None):
-        if total_filtered is None:
-            total_filtered = len(self._get_filtered_messages())
-
-        total_pages = max(1, math.ceil(total_filtered / self.messages_per_page))
-        
-        if self.current_page >= total_pages:
-            self.current_page = total_pages - 1
-            
-        self.btn_prev.setEnabled(self.current_page > 0)
-        self.btn_next.setEnabled(self.current_page < total_pages - 1)
-        
-        self.page_label.setText(f"Página {self.current_page + 1} de {total_pages}")
-        
-        if self.active_filter:
-            self.message_count_label.setText(f"Filtrado: {total_filtered}")
-        else:
-            self.message_count_label.setText(f"Total: {total_filtered}")
-
-    def _rebuild_message_display(self):
-        self._clear_message_layout()
-        
-        filtered_messages = self._get_filtered_messages()
-        total_filtered = len(filtered_messages)
-
-        self._update_pagination_labels(total_filtered)
-        
-        start_index = self.current_page * self.messages_per_page
-        end_index = start_index + self.messages_per_page
-        display_messages = filtered_messages[start_index:end_index]
-        
-        for msg in display_messages:
-            sender = msg.get('sender')
-            log_index = msg.get('log_index')
-            
-            sender_state_log = self.log_store.get_latest_agent_state_before_index(sender, log_index)
-            
-            action_string = self._extract_action_from_log(sender_state_log)
-            
-            card = MessageCard(msg, self.active_filter, action_string)
-            self.message_layout.addWidget(card)
-        
-        self.message_layout.addStretch() 
-
-    def _go_to_next_page(self):
-        self.current_page += 1
-        self._rebuild_message_display()
-        
-    def _go_to_prev_page(self):
-        if self.current_page > 0:
-            self.current_page -= 1
-            self._rebuild_message_display()
-        
-    def _clear_message_layout(self):
-        item = self.message_layout.takeAt(self.message_layout.count() - 1)
-        if item and not item.widget(): 
-            del item
-            
-        while self.message_layout.count():
-            child = self.message_layout.takeAt(0)
-            if child.widget(): child.widget().deleteLater()
-            
     def _add_participant_button(self, agent_name):
         button = QPushButton(agent_name)
         button.setObjectName("FilterButton")
         button.setCheckable(True)
+        
         button.clicked.connect(lambda checked, name=agent_name: self._set_filter(name))
         self.button_group.addButton(button)
         
@@ -366,16 +433,26 @@ class MensagensPage(QWidget):
                 return
         self.participants_layout.addWidget(button)
 
-    def _set_filter(self, agent_name):
-        self.active_filter = agent_name
-        self.current_page = 0 
-        self._rebuild_message_display()
+    def _set_filter(self, name):
+        self.active_filter = name
+        self.model.set_filter(name)
+        self.delegate.set_filter_state(name)
+        self._update_pagination_ui()
+        self.message_list_view.scrollToTop()
 
     def _clear_filter(self):
         self.active_filter = None
-        self.current_page = 0 
+        
         if self.button_group.checkedButton():
             self.button_group.checkedButton().setChecked(False)
-        self.show_all_button.setChecked(True) 
+        self.show_all_button.setChecked(True)
         
-        self._rebuild_message_display()
+        self.model.set_filter(None)
+        self.delegate.set_filter_state(None)
+        self._update_pagination_ui()
+        self.message_list_view.scrollToTop()
+
+    def update_theme(self):
+        self.delegate.update_theme()
+
+        self.message_list_view.viewport().update()

@@ -1,16 +1,21 @@
 theme_colors = {
-    "background_primary": "#F1F8FF",
-    "background_secondary": "#EAEAEA",
-    "background_tertiary": "#899DBB",
+    "background_primary":"#DADADC",
+
+    "background_secondary": "#C5C4CA",
+    
+    "background_tertiary": "#96959A",
 
     "interactive_primary": "#3B82F6",
     "interactive_hover": "#60A5FA",
     "interactive_pressed": "#2563EB",
     "interactive_text": "#FFFFFF",
 
-    "text_primary": "#0C131B",
-    "text_secondary": "#0C131B",
-    "text_disabled": "#0C131B",
+    # Texto Principal (Preto quase absoluto)
+    "text_primary": "#111827",
+
+    "text_secondary": "#4B5563",
+    
+    "text_disabled": "#9CA3AF",
 
     "success": "#059669",
     "warning": "#D97706",

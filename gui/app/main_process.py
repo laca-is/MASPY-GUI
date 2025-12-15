@@ -2,10 +2,11 @@ import multiprocessing
 import sys
 import threading
 import time
+import re
+from queue import Empty 
 from PyQt5.QtWidgets import QApplication
 from gui.app.main_window import InterfaceWindow
-from maspy import *
-import re
+from maspy import Admin
 from maspy.logger import QueueListener
 from gui.assets.theme.styler import load_stylesheet
 
@@ -15,22 +16,39 @@ class InterfaceProcess:
         self.new_queue = multiprocessing.Queue()
 
     def _dispatch_log_records(self, listener):
+        buffer = []
+        last_flush = time.time()
+        BATCH_SIZE = 500
+        FLUSH_INTERVAL = 0.05
+        
         try:
             while True:
-                log_list = listener.get_records()
-                if log_list:
-                    self.new_queue.put(log_list)
                 
-                time.sleep(5)
+                records = listener.get_records() 
+                
+                if records:
+                    buffer.extend(records)
+                else:
+                    time.sleep(1)
+
+                current_time = time.time()
+                
+                if buffer and (len(buffer) >= BATCH_SIZE or (current_time - last_flush) >= FLUSH_INTERVAL):
+                    self.new_queue.put(buffer)
+                    buffer = []
+                    last_flush = current_time
                 
         except Exception as e:
-            print(f"ERRO NO DISPATCHER DE LOGS: {e}", file=sys.__stderr__)
+            print(f"ERRO CRÍTICO NO DISPATCHER DE LOGS: {e}", file=sys.__stderr__)
 
     def start(self):
         listener = QueueListener()
-        aux = str(Admin()._num_agent)
-        valores = re.findall(r':\s*(\d+)', aux)
-        num_agents = sum(int(valor) for valor in valores)
+        try:
+            aux = str(Admin()._num_agent)
+            valores = re.findall(r':\s*(\d+)', aux)
+            num_agents = sum(int(valor) for valor in valores)
+        except:
+            num_agents = 0
 
         log_dispatcher_thread = threading.Thread(
             target=self._dispatch_log_records, 

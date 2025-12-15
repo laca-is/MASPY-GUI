@@ -9,13 +9,13 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Configurações")
+        self.setWindowTitle("Settings")
         self.setWindowModality(Qt.ApplicationModal)
         self.setMinimumWidth(500)
         
         main_layout = QVBoxLayout(self)
         
-        title = QLabel("Configurações da Interface")
+        title = QLabel("Interface Settings")
         title.setProperty("class", "h2")
         main_layout.addWidget(title)
 
@@ -23,17 +23,17 @@ class SettingsDialog(QDialog):
         theme_frame.setFrameShape(QFrame.StyledPanel)
         theme_layout = QVBoxLayout(theme_frame)
         
-        theme_title = QLabel("Tema (Aparência)")
+        theme_title = QLabel("Style")
         theme_title.setProperty("class", "h3")
         theme_layout.addWidget(theme_title)
         
         self.button_group_theme = QButtonGroup(self)
         
         btn_layout = QHBoxLayout()
-        self.btn_light = QPushButton("Claro (Light)")
+        self.btn_light = QPushButton("Light")
         self.btn_light.setCheckable(True)
         
-        self.btn_dark = QPushButton("Escuro (Dark)")
+        self.btn_dark = QPushButton("Dark")
         self.btn_dark.setCheckable(True)
         self.btn_dark.setChecked(True)
         
@@ -53,13 +53,13 @@ class SettingsDialog(QDialog):
         lang_frame.setFrameShape(QFrame.StyledPanel)
         lang_layout = QVBoxLayout(lang_frame)
 
-        lang_title = QLabel("Idioma (Language)")
+        lang_title = QLabel("Language")
         lang_title.setProperty("class", "h3")
         lang_layout.addWidget(lang_title)
         
         self.combo_lang = QComboBox()
-        self.combo_lang.addItem("Português (Padrão)")
-        self.combo_lang.addItem("Inglês (Não implementado)")
+        self.combo_lang.addItem("English")
+        self.combo_lang.addItem("Portuguese (not implemented yet)")
         self.combo_lang.setEnabled(False)
         
         lang_layout.addWidget(self.combo_lang)
@@ -67,6 +67,6 @@ class SettingsDialog(QDialog):
         
         main_layout.addStretch()
 
-        self.close_button = QPushButton("Fechar")
+        self.close_button = QPushButton("Close")
         self.close_button.clicked.connect(self.accept)
         main_layout.addWidget(self.close_button, alignment=Qt.AlignRight)

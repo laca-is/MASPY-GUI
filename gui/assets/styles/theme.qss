@@ -1,11 +1,11 @@
 /* =================================================================
-   STYLESHEET GLOBAL - PROPOSTA DE REDESIGN V1
+   STYLESHEET GLOBAL - PROPOSTA DE REDESIGN V1 (COM BLOCOS DE AGENTE)
    ================================================================= */
 
 /* --- Configurações Globais (Fonte e Fundo Base) --- */
 * {
     font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 14px;
+font-size: 14px;
     border: none;
 }
 
@@ -15,7 +15,8 @@
 
 QWidget {
     color: {text_primary};
-    background-color: {background_primary}; /* Fundo principal da janela */
+    background-color: {background_primary};
+/* Fundo principal da janela */
 }
 
 /* Fundo das páginas dentro do QStackedWidget */
@@ -37,7 +38,7 @@ QScrollArea > QWidget > QWidget {
 QScrollBar:vertical {
     border: none;
     background: {background_primary};
-    width: 10px;
+width: 10px;
     margin: 0;
 }
 QScrollBar::handle:vertical {
@@ -66,14 +67,14 @@ TopBar QLabel {
 
 SideBar {
     background-color: {background_secondary};
-    border-right: 1px solid {background_tertiary};
+border-right: 1px solid {background_tertiary};
 }
 SideBar QPushButton {
     background-color: transparent;
     color: {text_secondary};
     font-weight: bold;
     border-radius: 6px;
-    padding: 12px 18px; /* Mais espaçamento interno */
+padding: 12px 18px; /* Mais espaçamento interno */
     margin: 4px 10px;
     text-align: left;
 }
@@ -84,16 +85,26 @@ SideBar QPushButton:hover {
 SideBar QPushButton:checked {
     background-color: {background_tertiary};
     color: {text_primary};
-    border-left: 3px solid {interactive_primary};
+border-left: 3px solid {interactive_primary};
 }
 
 
 /* --- Cards e Conteúdo Elevado --- */
+/* Mantivemos a configuração base para todos */
 QFrame[class="card"], AgentCard, MessageCard {
     background-color: {background_secondary};
-    border-radius: 8px;
-    padding: 16px; /* Aumento significativo do padding */
+border-radius: 8px;
+    padding: 16px; 
 }
+
+/* --- ALTERAÇÃO AQUI: Borda específica para o AgentCard --- */
+AgentCard {
+    border: 2px solid {background_tertiary}; /* Cria o bloco visual */
+}
+AgentCard:hover {
+    border-color: {interactive_primary}; /* Efeito visual ao passar o mouse */
+}
+
 MessageCard {
     margin-bottom: 8px;
 }
@@ -104,7 +115,7 @@ QLineEdit, QSpinBox, QDoubleSpinBox {
     background-color: {background_primary};
     color: {text_primary};
     padding: 10px 12px;
-    border: 1px solid {background_tertiary};
+border: 1px solid {background_tertiary};
     border-radius: 6px;
     font-size: 14px;
 }
@@ -117,7 +128,8 @@ QTextEdit, QListWidget, QTreeWidget {
     color: {text_primary};
     border: 1px solid {background_tertiary};
     border-radius: 6px;
-    padding: 8px; /* Espaçamento interno para o texto não colar na borda */
+    padding: 8px;
+/* Espaçamento interno para o texto não colar na borda */
 }
 
 /* Ajuste de foco para consistência */
@@ -132,14 +144,14 @@ QTabWidget::pane {
     border: 1px solid {background_tertiary};
     border-top: none;
     border-bottom-left-radius: 6px;
-    border-bottom-right-radius: 6px;
+border-bottom-right-radius: 6px;
 }
 QTabWidget::tab-bar { alignment: left; }
 QTabBar::tab {
     background: {background_secondary};
     color: {text_secondary};
     border: 1px solid {background_tertiary};
-    border-bottom: none;
+border-bottom: none;
     padding: 14px 25px;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
@@ -148,19 +160,22 @@ QTabBar::tab {
 }
 QTabBar::tab:hover {
     background: {background_tertiary};
-    color: {text_primary};
+color: {text_primary};
 }
 QTabBar::tab:selected {
     background: {background_secondary}; /* Mesmo fundo do painel */
     color: {interactive_primary};
-    border-bottom: 2px solid {interactive_primary}; /* Indicador de seleção */
+border-bottom: 2px solid {interactive_primary}; /* Indicador de seleção */
 }
 
 #AgentDetailWindow QTabBar::tab {
-    font-size: 13px;      /* Um pouco maior que o padrão */
+    font-size: 13px;
+/* Um pouco maior que o padrão */
     font-weight: bold;
-    padding: 14px 35px;   /* Mais padding horizontal (antes era 25px) */
-    min-width: 100px;     /* Garante uma largura mínima */
+    padding: 14px 35px;
+/* Mais padding horizontal (antes era 25px) */
+    min-width: 100px;
+/* Garante uma largura mínima */
 }
 
 
@@ -170,7 +185,7 @@ QTabBar::tab:selected {
 
 QPushButton {
     background-color: {background_tertiary};
-    color: {text_primary};
+color: {text_primary};
     font-weight: bold;
     border-radius: 6px;
     padding: 10px 18px;
@@ -208,7 +223,7 @@ QPushButton#pause_button:hover {
 /* --- Botões de Filtro --- */
 QPushButton[objectName="FilterButton"] {
     background-color: transparent;
-    border: 1px solid {background_tertiary};
+border: 1px solid {background_tertiary};
     padding: 8px 12px;
     text-align: left;
 }
@@ -229,7 +244,7 @@ QPushButton[objectName="FilterButton"]:checked {
 /* --- Títulos Principais de Página --- */
 QLabel[class="h1"] {
     font-size: 28px;
-    font-weight: bold;
+font-weight: bold;
     color: {text_primary};
     margin-bottom: 10px; /* Espaçamento abaixo do título */
 }
@@ -237,7 +252,7 @@ QLabel[class="h1"] {
 /* --- Títulos de Seção --- */
 QLabel[class="h2"] {
     font-size: 18px;
-    font-weight: bold;
+font-weight: bold;
     color: {text_secondary};
     margin-top: 10px;
     margin-bottom: 5px;

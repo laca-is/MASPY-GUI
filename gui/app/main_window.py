@@ -12,7 +12,7 @@ from gui.core.log_store import LogStore
 from gui.core.data_model import AgentDataModel
 
 from gui.widgets.settings_dialog import SettingsDialog
-from gui.assets.theme.styler import load_stylesheet
+from gui.assets.theme.styler import load_stylesheet, set_active_theme, current_theme
 
 class InterfaceWindow(QWidget):
     
@@ -20,7 +20,7 @@ class InterfaceWindow(QWidget):
 
     def __init__(self, command_queue, num_agents, new_queue):
         super().__init__()
-        self.setWindowTitle("MASPY INTERFACE")
+        self.setWindowTitle("MASPY GUI")
         self.setGeometry(100, 100, 1200, 700)
         
         self._current_theme = "dark" 
@@ -46,6 +46,8 @@ class InterfaceWindow(QWidget):
         self.timeline_index_changed.connect(self.data_model.on_store_updated)
 
         self.log_thread.start()
+        
+        self.settings_dialog = None
 
     def _setup_ui(self):
         main_layout = QHBoxLayout(self)
@@ -70,17 +72,17 @@ class InterfaceWindow(QWidget):
         timeline_layout = QHBoxLayout(self.timeline_frame)
         timeline_layout.setContentsMargins(10, 5, 10, 5)
         
-        self.timeline_label = QLabel("Tempo: 00:00:00.000 / 00:00:00.000") 
+        self.timeline_label = QLabel("Time: 00:00:00.000 / 00:00:00.000") 
         self.timeline_slider = QSlider(Qt.Horizontal)
         self.timeline_slider.setMinimum(0)
         self.timeline_slider.setMaximum(0) 
         
         self.timeline_input = QLineEdit()
-        self.timeline_input.setPlaceholderText("Ir para (ms)...")
+        self.timeline_input.setPlaceholderText("Go to(ms)...")
         self.timeline_input.setMinimumWidth(100) 
         self.timeline_input.returnPressed.connect(self._on_timeline_input)
         
-        timeline_layout.addWidget(QLabel("Linha do Tempo:"))
+        timeline_layout.addWidget(QLabel("Timeline:"))
         timeline_layout.addWidget(self.timeline_slider, stretch=1) 
         timeline_layout.addWidget(self.timeline_input) 
         timeline_layout.addWidget(self.timeline_label)
@@ -115,24 +117,19 @@ class InterfaceWindow(QWidget):
         self.timeline_slider.sliderReleased.connect(self._on_timeline_slider_released)
         
         self.sidebar.buttons["Menu"].clicked.connect(lambda: self.show_page(0, "Menu"))
-        self.sidebar.buttons["Agentes"].clicked.connect(lambda: self.show_page(1, "Agentes"))
-        self.sidebar.buttons["Ambiente"].clicked.connect(lambda: self.show_page(2, "Ambiente"))
-        self.sidebar.buttons["Mensagens"].clicked.connect(lambda: self.show_page(3, "Mensagens"))
+        self.sidebar.buttons["Agents"].clicked.connect(lambda: self.show_page(1, "Agents"))
+        self.sidebar.buttons["Environment"].clicked.connect(lambda: self.show_page(2, "Environment"))
+        self.sidebar.buttons["Messages"].clicked.connect(lambda: self.show_page(3, "Messages"))
 
         self.sidebar.buttons["Menu"].setChecked(True)
 
     def _open_settings(self):
-        try:
-            if not self.settings_dialog.isVisible():
-                self.settings_dialog.show()
-                self.settings_dialog.activateWindow()
-            else:
-                self.settings_dialog.activateWindow()
-        except (AttributeError, RuntimeError):
+        if self.settings_dialog is None:
             self.settings_dialog = SettingsDialog(self)
             self.settings_dialog.theme_changed.connect(self._apply_theme)
-            self.settings_dialog.setAttribute(Qt.WA_DeleteOnClose) 
-        
+            self.settings_dialog.setAttribute(Qt.WA_DeleteOnClose)
+            self.settings_dialog.destroyed.connect(self._on_settings_closed)
+
         if self._current_theme == 'light':
             self.settings_dialog.btn_light.setChecked(True)
         else:
@@ -141,16 +138,36 @@ class InterfaceWindow(QWidget):
         self.settings_dialog.show()
         self.settings_dialog.activateWindow()
 
+    def _on_settings_closed(self):
+        self.settings_dialog = None
+
     def _apply_theme(self, theme_name):
         if theme_name == self._current_theme:
             return 
-            
-        print(f"[InterfaceWindow] Aplicando tema: {theme_name}")
+
+        set_active_theme(theme_name)
+        self._current_theme = theme_name 
+
         app_instance = QApplication.instance()
         if app_instance:
             stylesheet = load_stylesheet(theme_name)
             app_instance.setStyleSheet(stylesheet)
-            self._current_theme = theme_name 
+        self._propagate_theme_to_pages()
+
+    def _propagate_theme_to_pages(self):
+        pages = [
+            self.page_menu,
+            self.page_agentes,
+            self.page_mensagens,
+            self.page_ambiente
+        ]
+        
+        for page in pages:
+            if hasattr(page, 'update_theme'):
+                try:
+                    page.update_theme()
+                except Exception as e:
+                    print(f"[Theme] Erro ao atualizar tema em {page}: {e}")
 
     def _ms_to_time_str(self, ms_value):
         if ms_value < 0:
@@ -200,7 +217,7 @@ class InterfaceWindow(QWidget):
         if self.log_store.is_live:
             self.timeline_slider.setValue(new_max_ms)
             max_time_str = self._ms_to_time_str(new_max_ms)
-            self.timeline_label.setText(f"Tempo: {max_time_str} / {max_time_str}")
+            self.timeline_label.setText(f"Time: {max_time_str} / {max_time_str}")
         
         self.timeline_slider.blockSignals(False)
 
@@ -216,7 +233,7 @@ class InterfaceWindow(QWidget):
         current_time_str = self._ms_to_time_str(ms_value)
         max_time_str = self._ms_to_time_str(max_val_ms)
         
-        self.timeline_label.setText(f"Tempo: {current_time_str} / {max_time_str}")
+        self.timeline_label.setText(f"Time: {current_time_str} / {max_time_str}")
 
     def _on_timeline_slider_released(self):
         index = self.log_store.get_index_from_ms(self.timeline_slider.value())
