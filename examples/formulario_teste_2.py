@@ -15,7 +15,7 @@ class Parking(Environment):
         spot = self.get(Percept("spot",(spot_id,"free")))
         self.print(f"Driver {agt} parking on spot({spot_id})")
         if spot:
-            self.change(spot,(spot_id,[agt]))
+            self.change(spot, values=(spot_id,[agt]))
             return True
         else:
             self.print(f"Requested spot({spot_id}) unavailable")
@@ -25,7 +25,7 @@ class Parking(Environment):
         spot = self.get(Percept("spot",(Any,[agt])))
         if spot:
             self.print(f"Driver {agt} leaving spot({spot.values[0]})")
-            self.change(spot,(spot.values[0],"free"))
+            self.change(spot, values=(spot.values[0],"free"))
         else:
             self.print(f"Driver {agt} not found in any spot")
 
@@ -128,7 +128,6 @@ class Driver(Agent):
         confirm = self.park_spot(spot_id)
         if confirm is None:
             self.print(f"Spot is unavailable after given by {src}")
-            self.disconnect_from(park_name)
             self.stop_cycle()
             return None
         sleep(self.wait_time)
@@ -161,4 +160,4 @@ def main(num_agents: int = 10, num_spots: int = 5):
 
         
 if __name__ == "__main__":
-    main(100,15)
+    main(50,10)
